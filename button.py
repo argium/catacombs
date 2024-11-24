@@ -10,9 +10,9 @@ import copy
 
 
 
-def decode(ciphertext, interupts):
-    if len(ciphertext) != len(interupts)+1:
-        raise ValueError("Number of interupts must be one less than the length of the ciphertext")
+def decode(ciphertext, interrupts):
+    if len(ciphertext) != len(interrupts)+1:
+        raise ValueError("Number of interrupts must be one less than the length of the ciphertext")
 
     # Sum keeps track of how many rotations (aka. numbers that have been counted down) have been made. Effectively tracks the 
     # *actual* position of the rotor which is modified when it's interrupted
@@ -20,7 +20,7 @@ def decode(ciphertext, interupts):
 
     # Each character of the ciphertext is shifted by a certain amount (using its ordinal value) to get the plaintext
     shifts = []
-    for i in range(1,len(interupts)+2):
+    for i in range(1,len(interrupts)+2):
         # print("i=" + str(i), end="\t")
 
         # First determine how far the rotor wants to move. It was observed that this is 20 less the number of times the button has been pushed.
@@ -31,8 +31,8 @@ def decode(ciphertext, interupts):
         y = abs(x - sum) % 20
         # print("y=" + str(y), end="\t")
 
-        if i <= len(interupts):
-            interrupt = interupts[i-1]
+        if i <= len(interrupts):
+            interrupt = interrupts[i-1]
             if interrupt < 20-y:
                 raise ValueError("Interrupt value (" + str(interrupt) + ") is less than the number it would have stopped at (" + str(20-y) + ")")
             x2 = 20-interrupt
@@ -64,44 +64,66 @@ def decode(ciphertext, interupts):
     # Apply the shifts to the input string
     plaintext = [new_pos(c, shifts[i]) for i,c in enumerate(ciphertext)]
     plaintext = "".join(plaintext)
-    print("Output:"+plaintext)
+    # print("Output:"+plaintext)
     return plaintext
 
 
 # read interrupts from args
-ciphertext = sys.argv[1]
-print("ciphertext=" + ciphertext)
-# interupts = []
+# ciphertext = sys.argv[1]
+# print("ciphertext=" + ciphertext)
+# interrupts = []
 # for i in range(2, len(sys.argv)):
-#     interupts.append(int(sys.argv[i]))
+#     interrupts.append(int(sys.argv[i]))
 
-def bruteforce(ciphertext, interupts, pos, plaintexts):
+def bruteforce_impl(ciphertext, interrupts, pos, plaintexts):
     # print("pos=" + str(pos), end="\t")
     # base case
     if pos == len(ciphertext)-1:
         try:
-            plaintext = decode(ciphertext, interupts)
-            plaintexts.append(plaintext)
+            plaintext = decode(ciphertext, interrupts)
+            plaintexts.append((interrupts, plaintext))
         except ValueError as e:
-            print(" ".join([str(c) for c in interupts]) + " is not valid.")
+            # print(" ".join([str(c) for c in interrupts]) + " is not valid.")
+            pass
             
-        # print(" ".join([str(c) for c in interupts]))
+        # print(" ".join([str(c) for c in interrupts]))
     else:
         for i in range(1, 21):
             # SORRY for this. It's LATE and I am le tired.
-            next = copy.deepcopy(interupts)
+            next = copy.deepcopy(interrupts)
             next.append(i)
-            # print(" ".join([str(c) for c in interupts]))
+            # print(" ".join([str(c) for c in interrupts]))
 
-            bruteforce(ciphertext, next, pos+1, plaintexts)
+            bruteforce_impl(ciphertext, next, pos+1, plaintexts)
 
-plaintexts = []
-bruteforce(ciphertext, [], 0, plaintexts)
+# https://github.com/dwyl/english-words/tree/master
+def load_words():
+    with open('words_alpha.txt') as word_file:
+        valid_words = set(word_file.read().split())
 
-# write to file
-with open("plaintexts.txt", "w") as f:
-    for p in plaintexts:
-        f.write(p + "\n")
-# decode(ciphertext, interupts)
+    return valid_words
+
+def bruteforce(ciphertext, english_words):
+    plaintexts = []
+    bruteforce_impl(ciphertext, [], 0, plaintexts)
+
+    for interrupts, txt in plaintexts:
+        if txt.lower() in english_words:
+            print(f"{'Interrupts: ' + " ".join([str(c) for c in interrupts]):<25} Plaintext: {txt}")
+
+    # write to file
+    # with open("plaintexts.txt", "w") as f:
+    #     for p in plaintexts:
+    #         f.write(p + "\n")
+    # decode(ciphertext, interrupts)
+
+
+english_words = load_words()
+bruteforce("SGHO", english_words)
+bruteforce("EIUII", english_words)
+bruteforce("ABD", english_words)
+
+
 
 # SGHO EIUII ABD MOO NK GHN, EDNY, DL LLSE
+# It was originally solved in Chinese, and backwards translated to "Undying orc love lights up body, mind, and soul".
