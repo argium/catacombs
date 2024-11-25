@@ -13,3 +13,6 @@ indent_size = 2
 [*.{ps1}]
 indent_style = tab
 indent_size = 4
+
+# CA1050: Declare types in namespaces
+dotnet_diagnostic.CA1050.severity = none
