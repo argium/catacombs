@@ -75,13 +75,16 @@ def decode(ciphertext, interrupts):
 # for i in range(2, len(sys.argv)):
 #     interrupts.append(int(sys.argv[i]))
 
-def bruteforce_impl(ciphertext, interrupts, pos, plaintexts):
+def bruteforce_impl(ciphertext, interrupts, pos, plaintexts, english_words):
     # print("pos=" + str(pos), end="\t")
     # base case
     if pos == len(ciphertext)-1:
         try:
             plaintext = decode(ciphertext, interrupts)
             plaintexts.append((interrupts, plaintext))
+
+            if plaintext.lower() in english_words:
+                print(f"{'Interrupts: ' + " ".join([str(c) for c in interrupts]):<25} Plaintext: {txt}")            
         except ValueError as e:
             # print(" ".join([str(c) for c in interrupts]) + " is not valid.")
             pass
@@ -94,7 +97,7 @@ def bruteforce_impl(ciphertext, interrupts, pos, plaintexts):
             next.append(i)
             # print(" ".join([str(c) for c in interrupts]))
 
-            bruteforce_impl(ciphertext, next, pos+1, plaintexts)
+            bruteforce_impl(ciphertext, next, pos+1, plaintexts, english_words)
 
 # https://github.com/dwyl/english-words/tree/master
 def load_words():
@@ -105,11 +108,11 @@ def load_words():
 
 def bruteforce(ciphertext, english_words):
     plaintexts = []
-    bruteforce_impl(ciphertext, [], 0, plaintexts)
+    bruteforce_impl(ciphertext, [], 0, plaintexts, english_words)
 
-    for interrupts, txt in plaintexts:
-        if txt.lower() in english_words:
-            print(f"{'Interrupts: ' + " ".join([str(c) for c in interrupts]):<25} Plaintext: {txt}")
+    # for interrupts, txt in plaintexts:
+    #     if txt.lower() in english_words:
+    #         print(f"{'Interrupts: ' + " ".join([str(c) for c in interrupts]):<25} Plaintext: {txt}")
 
     # write to file
     # with open("plaintexts.txt", "w") as f:
@@ -119,9 +122,9 @@ def bruteforce(ciphertext, english_words):
 
 
 english_words = load_words()
-bruteforce("SGHO", english_words)
-bruteforce("EIUII", english_words)
-bruteforce("ABD", english_words)
+bruteforce("JYPFFQVY", english_words)
+# bruteforce("EIUII", english_words)
+# bruteforce("ABD", english_words)
 
 
 
