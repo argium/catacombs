@@ -10,8 +10,7 @@ def get_sequence(key):
 
   # zip list
   sorted = dict(zip(sorted, range(1, len(key)+1)))
-  print(sorted)
-  return sorted
+  return [sorted[c] for c in key]
 
 def get_table(plaintext, count):
   # split by count
