@@ -5,11 +5,10 @@ using ILoggerFactory factory = LoggerFactory.Create(builder =>
     builder
         .AddFilter("Microsoft", LogLevel.Warning)
         .AddFilter("System", LogLevel.Warning)
-        .AddFilter("lightsout", LogLevel.Trace)
+        .AddFilter("lightsout", LogLevel.Information)
         .AddConsole());
 
 ILogger logger = factory.CreateLogger("lightsout");
-
 
 if (args.Length != 2) {
     logger.LogInformation("dotnet run \"<starting positions>\" \"<grouped statues>\"");
@@ -40,42 +39,55 @@ if (startingPositions.Any(n => n < 1 || n > 25)) {
 
 // Parse grouped statues
 Dictionary<uint, HashSet<uint>> groups = new();
-try {
-    foreach (string group in args[1].Split(";")) {
-        string[] parts = group.Split(":");
-        uint pos = uint.Parse(parts[0]);
-        HashSet<uint> statues = new();
-        foreach (uint statue in parts[1].Split(" ").Select(uint.Parse)) {
-            statues.Add(statue);
-        }
-
-        if (statues.Count != 4) {
-            logger.LogError("Invalid grouping for statue {Pos}: must have 4 links", pos);
-            return 1;
-        }
-
-        if (statues.Contains(pos)) {
-            logger.LogError("Invalid grouping for statue {Pos}: cannot link to itself", pos);
-            return 1;
-        }
-
-        if (statues.Any(n => n < 1 || n > 25)) {
-            logger.LogError("Invalid grouping for statue {Pos}: all numbers must be between 1-25", pos);
-            return 1;
-        }
-
-        if (groups.ContainsKey(pos)) {
-            logger.LogError("Invalid grouping for statue {Pos}: duplicate", pos);
-            return 1;
-        }
-
-        groups[pos] = statues;
-    }
-}
-catch (FormatException e) {
-    logger.LogError("Grouped statues must be numbers");
-    logger.LogError(e.ToString());
+// Treat as a file
+string path = args[1];
+if (!File.Exists(path)) {
+    logger.LogError("File not found: {Path}", path);
     return 1;
+}
+
+string[] text = File.ReadAllLines(path);
+for (uint i = 1; i <= text.Length; i++) {
+    string[] parts = text[i-1].Split(":");
+
+    if (parts.Length != 2) {
+        logger.LogError("Invalid grouping for statue {I}: must be in the format 'pos:space-separated stsatues'", i);
+        return 1;
+    }
+
+    // uint pos = uint.Parse(parts[0]);
+    HashSet<uint> statues = new();
+    try {
+        statues = [.. parts[1].Split(" ").Select(uint.Parse)];
+    }
+    catch (FormatException e) {
+        logger.LogError("Invalid grouping for statue {I}: must be numbers", i);
+        logger.LogError(e.ToString());
+        return 1;
+    }
+
+    if (statues.Count != 4) {
+        logger.LogError("Invalid grouping for statue {I}: must have 4 links", i);
+        return 1;
+    }
+
+    if (statues.Contains(i)) {
+        logger.LogError("Invalid grouping for statue {I}: cannot link to itself", i);
+        return 1;
+    }
+
+    if (statues.Any(n => n < 1 || n > 25)) {
+        logger.LogError("Invalid grouping for statue {I}: all numbers must be between 1-25", i);
+        return 1;
+    }
+
+    if (groups.ContainsKey(i)) {
+        logger.LogError("Invalid grouping for statue {I}: duplicate", i);
+        return 1;
+    }        
+
+    groups[i] = statues;
+
 }
 
 if (groups.Count != 25) {
@@ -84,13 +96,14 @@ if (groups.Count != 25) {
 }
 
 // Constants
-int MaxDepth = 1;
-int WorkerCount = 1;
+int MaxDepth = 25;
+int WorkerCount = 1;  // Probably won't work without a concurrent priority queue or locks
 
 // State and action queue
 var state = new State { Up = new(startingPositions), Groups = groups };
 var visited = new HashSet<State>();
-var queue = new ConcurrentQueue<ActionContext>();
+// var queue = new ConcurrentQueue<ActionContext>();
+var queue = new PriorityQueue<ActionContext, int>();
 var cts = new CancellationTokenSource();
 int workerId = 0;
 
@@ -99,11 +112,8 @@ async Task SolveAsyncImpl(CancellationToken cancellationToken)
 {
     int id = Interlocked.Increment(ref workerId);
     logger.LogInformation("Worker {Id} started", id);
-    logger.LogTrace("queue.Count={Count}", queue.Count);
-    while (queue.TryDequeue(out ActionContext? context)) {
-        logger.LogTrace("queue.Count={Count}", queue.Count);
-        logger.LogTrace("State={State}", state);
-        logger.LogTrace("Actions={Actions}", string.Join(",", context.Actions));        
+    while (queue.TryDequeue(out ActionContext? context, out int _)) {
+        logger.LogTrace(context.ToString());
 
         if (cancellationToken.IsCancellationRequested) {
             logger.LogDebug("Cancellation requested");
@@ -131,7 +141,7 @@ async Task SolveAsyncImpl(CancellationToken cancellationToken)
             // If it's not solved then queue up the next possible actions
             foreach (uint next in newState.Up) {
                 if (!visited.Contains(newState)) {
-                    queue.Enqueue(new ActionContext { State = newState, Actions = actions, Next = next });
+                    queue.Enqueue(new ActionContext { State = newState, Actions = actions, Next = next }, newState.Up.Count);
                 }
             }
         }
@@ -142,7 +152,7 @@ async Task SolveAsyncImpl(CancellationToken cancellationToken)
 
 // Add initial actions to the queue
 foreach (uint next in state.Up) {
-    queue.Enqueue(new ActionContext { State = state, Actions = [], Next = next });
+    queue.Enqueue(new ActionContext { State = state, Actions = [], Next = next }, state.Up.Count);
 }
 
 logger.LogInformation("queue.Count={Count}", queue.Count);
@@ -164,6 +174,8 @@ public class ActionContext
     public required State State { get; init; }
     public required List<uint> Actions { get; init; }
     public required uint Next { get; init; }
+
+    public override string ToString() => $"State={State} Actions={string.Join(",", Actions)} Next={Next}";
 }
 
 public class State : IEquatable<State>

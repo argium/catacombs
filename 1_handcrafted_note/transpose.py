@@ -32,9 +32,25 @@ def printall(key, sequence, table):
     print()  
   print()
 
+def print_table(table):
+  for row in table:
+    for c in row:
+      print(f"{c:<3}", end='')
+    print()  
+  print()
+
+def transpose(table):
+  table.sort(key=lambda x: )
+  new = []
+  for row in table:
+    new_row = []
+  for i in range(len(table)):
+
 
   
 sequence = get_sequence(key)
 table = get_table(clue, len(key))
 print(table)
-printall(key, sequence, table)
+c = [[c for c in key]] + [[c for c in sequence]] + table
+print_table(c)
+# printall(key, sequence, table)
